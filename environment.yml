@@ -1,0 +1,12 @@
+ 
+name: pds4utils
+channels:
+  - defaults
+dependencies:
+  - python=3
+  - pandas
+  - pyyaml
+  - lxml
+  - pip
+  - pip:
+    - pds4-tools

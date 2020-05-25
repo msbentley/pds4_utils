@@ -1,0 +1,46 @@
+#---
+
+# Configuration of which attributes in a label should be scraped when
+# building a database (pandas DataFrame) of PDS products.
+# 
+# Each section must be labelled with a product
+# type. If filtering by LID is needed, the LID keyword can be set
+# and any LIDs containing this string will be processed.
+#
+# Under keywords place tuples of identifer and xpath. The database
+# will be populated with these data.
+#
+# One pandas dataframe will be produced for each entry
+
+# common:
+#   lid: ""
+#   keywords:
+#     lid:
+#         xpath: "pds:Identification_Area/pds:logical_identifier"
+#     version_id:
+#         xpath: "pds:Identification_Area/pds:version_id"
+
+Product_Observational:
+
+  mcam_raw_science:
+    lid: "bc_mtm_mcam:data_raw:cam_raw_sc"
+    keywords:
+      exposure: "pds:Observation_Area/pds:Discipline_Area/img:Imaging/img:Image_Product_Information/img:Exposure_Parameters/img:exposure_duration"
+
+  cassis_science:
+    lid: ".*em16_tgo.*cas_..._sc.*"
+    keywords:
+      filter: "/pds:Product_Observational/pds:Observation_Area/pds:Mission_Area/em16_tgo_cas:Cassis_Data/em16_tgo_cas:HK_Derived_Data/em16_tgo_cas:filter"
+      pixel_lat:  "/pds:Product_Observational/pds:Observation_Area/pds:Discipline_Area/geom:Geometry/geom:Geometry_Orbiter/geom:Surface_Geometry/geom:Surface_Geometry_Specific/geom:Footprint_Vertices/geom:Pixel_Intercept/geom:pixel_latitude"
+      pixel_lon: "/pds:Product_Observational/pds:Observation_Area/pds:Discipline_Area/geom:Geometry/geom:Geometry_Orbiter/geom:Surface_Geometry/geom:Surface_Geometry_Specific/geom:Footprint_Vertices/geom:Pixel_Intercept/geom:pixel_longitude"
+
+
+
+Product_Browse:
+
+  mcam_browse:
+    lid: "urn:esa:psa:bc_mpo_cam:browse_raw:cam_raw_sc"
+    keywords:
+      datalink: "pds:Reference_List/pds:Internal_Reference[pds:reference_type='browse_to_data']/pds:lid_reference"
+
+
