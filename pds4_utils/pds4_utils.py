@@ -4,33 +4,51 @@ pds_utils.py - a collection of utilities for dealing with PDS4 files"""
 
 from pds4_tools import pds4_read
 from pds4_tools.reader.table_objects import TableManifest
-import pds4_tools
+# import pds4_tools
 from pathlib import Path
 from lxml import etree
-import numpy as np
 import pandas as pd
 import sys
 import yaml
 import os
+import logging
 
 try:
    import cPickle as pickle
 except:
    import pickle
-   
 
-import logging
-log = logging.getLogger(__name__)
+# set up module level logging
 
 # only show warning or higher messages from PDS4 tools
 pds4_logger = logging.getLogger('PDS4ToolsLogger')
 pds4_logger.setLevel(logging.WARNING)
+
+class DuplicateFilter(logging.Filter):
+
+    def filter(self, record):
+        current_log = (record.module, record.levelno, record.msg)
+        last = getattr(self, "last_log", None)
+        if (last is None) or (last != current_log):
+            self.last_log = current_log
+            return True  # i.e. log the message
+        else:
+            return False  # i.e. do not log the message
+
+log = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+log.addHandler(handler)
+log.setLevel(logging.WARNING)
+
 
 default_config = os.path.join(
     os.environ.get('APPDATA') or
     os.environ.get('XDG_CONFIG_HOME') or
     os.path.join(os.environ['HOME'], '.config'),
     "pds_dbase.yml")
+
 
 def index_products(directory='.', pattern='*.xml'):
     """
@@ -222,7 +240,7 @@ class pds4_df(pd.DataFrame):
         return pds4_df
 
 
-def read_tables(label, label_directory='.', recursive=False, table_name=None, index_col=None, add_filename=False):
+def read_tables(label, label_directory='.', recursive=False, table_name=None, index_col=None, add_filename=False, quiet=False):
     """
     Accepts a directory and file-pattern or list and attempts to load the specified table
     (or first table, if none is specified) into a merged DataFrane. If the tables 
@@ -254,16 +272,21 @@ def read_tables(label, label_directory='.', recursive=False, table_name=None, in
     # de-dupe list
     file_list = list(set(file_list))
 
+    handler.addFilter(DuplicateFilter())
+    filter_inst = log.handlers[0].filters[-1]
+
     for f in file_list:
         if table is None:
-            table = read_table(f, table_name=table_name, index_col=index_col)
+            table = read_table(f, table_name=table_name, index_col=index_col, quiet=quiet)
             if add_filename:
                 table['filename'] = table.filename
         else:
-            temp_table = read_table(f, table_name=table_name, index_col=index_col)
+            temp_table = read_table(f, table_name=table_name, index_col=index_col, quiet=quiet)
             if add_filename:
                 temp_table['filename'] = temp_table.filename
             table = table.append(temp_table)
+
+    handler.removeFilter(filter_inst)
 
     table.sort_index(inplace=True)
 
