@@ -24,6 +24,10 @@ except:
 pds4_logger = logging.getLogger('PDS4ToolsLogger')
 pds4_logger.setLevel(logging.WARNING)
 
+# define the PDS namespace
+pds_ns = 'http://pds.nasa.gov/pds4/pds/v1'
+
+
 class DuplicateFilter(logging.Filter):
 
     def filter(self, record):
@@ -50,7 +54,7 @@ default_config = os.path.join(
     "pds_dbase.yml")
 
 
-def index_products(directory='.', pattern='*.xml'):
+def index_products(directory='.', pattern='*.xml', recursive=True):
     """
     Accepts a directory containing PDS4 products, indexes the labels and returns a 
     Pandas data-frame containng meta-data for each product.
@@ -58,12 +62,10 @@ def index_products(directory='.', pattern='*.xml'):
 
     from lxml import etree
     import pandas as pd
+    import math
 
-    # define the PDS namespace
-    pds_ns = 'http://pds.nasa.gov/pds4/pds/v1'
-    
     # recursively find all labels
-    labels = select_files(pattern, directory=directory, recursive=True)
+    labels = select_files(pattern, directory=directory, recursive=recursive)
 
     cols = ['filename', 'product_type', 'lid', 'vid', 'start_time', 'stop_time']
     index = pd.DataFrame([], columns=cols)
@@ -103,15 +105,76 @@ def index_products(directory='.', pattern='*.xml'):
     index['bundle'] = index.lid.apply(lambda x: x.split(':')[3])
     index['collection'] = index.lid.apply(lambda x: x.split(':')[4] if len(x.split(':'))>4 else None)
     index['product_id'] = index.lid.apply(lambda x: x.split(':')[-1])
-    # removed before publishing to GitHub as PSA specific
-    # index['sc_hk'] = index.apply(lambda row: row.product_id.split('_')[2] if row.product_type=='Product_Observational' else None, axis=1)
-    index.start_time=pd.to_datetime(index.start_time).dt.tz_localize(None)
-    index.stop_time=pd.to_datetime(index.stop_time).dt.tz_localize(None)
+
+    # make sure timestamps are stripped of timezones
+    index.start_time=pd.to_datetime(index.start_time.fillna(pd.NaT)).dt.tz_localize(None)
+    index.stop_time=pd.to_datetime(index.stop_time.fillna(pd.NaT)).dt.tz_localize(None)
 
     log.info('{:d} PDS4 labels indexed'.format(len(index)))
 
     return index
 
+
+def generate_collection(template, directory='.', pattern='*.xml', recursive=True):
+    """Generates a collection inventory from a set of files and a label template"""
+
+    index = index_products(directory, pattern, recursive)
+    if len(index)==0:
+        log.error('no valid products found')
+        return None
+
+    if len(index.bundle.unique()) > 1:
+        log.error('cannot mix products from multiple bundles')
+        return None
+
+    if len(index.collection.unique()) > 1:
+        log.error('cannot mix products from multiple collections')
+        return None
+    
+    collection_name = index.collection.unique()[0]
+    collection_csv = 'collection_{:s}.csv'.format(collection_name)
+    collection_xml = 'collection_{:s}.xml'.format(collection_name)
+
+    # remove any collection and bundle inventories from the product list
+    bad_types = ['Product_Collection', 'Product_Bundle']
+    bad_idx = bad = index[index.product_type.isin(bad_types)].index
+    index.drop(bad_idx, inplace=True)
+
+    # check for the template
+    if not Path(template).exists():
+        log.error('could not open template file {:s}'.format(template.name))
+        return None
+    else:
+        tree = etree.parse(template)
+        root = tree.getroot()
+        ns = root.nsmap
+        if None in ns and pds_ns == ns[None]:
+            ns['pds'] = ns.pop(None)
+
+    # add LID+VID => LIDVID
+    index['lidvid'] = index.apply(lambda row: '{:s}::{:s}'.format(row.lid, row.vid), axis=1)
+
+    # add a column for primary/secondary - ALL PRIMARY FOR NOW
+    index['primary'] = 'P'
+
+    # write the CSV
+    csv_file = os.path.join(directory, collection_csv)
+    index[['primary','lidvid']].to_csv(csv_file, header=False, index=False, line_terminator='\r\n')
+
+    # check if the template is a Product_Collection
+    if root.tag != '{http://pds.nasa.gov/pds4/pds/v1}Product_Collection':
+        log.error('template is not a Product_Collection')
+        return None
+
+    # write the filename, checksum and number of records into the template
+    root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:Inventory/pds:records', namespaces=ns)[0].text = str(len(index))
+    root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:records', namespaces=ns)[0].text = str(len(index))
+    root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:file_name', namespaces=ns)[0].text = collection_csv
+
+    tree.write(collection_xml, xml_declaration=True, encoding=tree.docinfo.encoding) 
+
+    return 
+    
 
 
 class Database:
