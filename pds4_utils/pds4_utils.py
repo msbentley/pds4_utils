@@ -41,10 +41,12 @@ class DuplicateFilter(logging.Filter):
 
 log = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+    datefmt='%Y-%m-%d %H:%M:%S')
+
 handler.setFormatter(formatter)
 log.addHandler(handler)
-log.setLevel(logging.WARNING)
+log.setLevel(logging.INFO)
 
 
 default_config = os.path.join(
@@ -170,11 +172,28 @@ def generate_collection(template, directory='.', pattern='*.xml', recursive=True
     root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:Inventory/pds:records', namespaces=ns)[0].text = str(len(index))
     root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:records', namespaces=ns)[0].text = str(len(index))
     root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:file_name', namespaces=ns)[0].text = collection_csv
+    root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:md5_checksum', namespaces=ns)[0].text = str(md5_hash(csv_file))
+
 
     tree.write(collection_xml, xml_declaration=True, encoding=tree.docinfo.encoding) 
 
     return 
-    
+
+
+def md5_hash(filename):
+
+    import hashlib
+
+    BLOCKSIZE = 65536
+    hasher = hashlib.md5()
+    with open(filename, 'rb') as f:
+        buf = f.read(BLOCKSIZE)
+        while len(buf) > 0:
+            hasher.update(buf)
+            buf = f.read(BLOCKSIZE)
+    return hasher.hexdigest()
+
+
 
 
 class Database:
@@ -199,12 +218,13 @@ class Database:
         # build an initial index
         if files is not None:
             self.index = index_products(directory=directory, pattern=files)
-
+        else:
+            self.index = index_products(directory=directory, pattern='*.xml')
             # initialise the dictionary of tables
-            self.dbase = {}
-
-            # build the database according to the config file and indexed
-            self.build()
+        
+        self.dbase = {}
+        # build the database according to the config file and indexed
+        self.build()
 
         
     def build(self):
