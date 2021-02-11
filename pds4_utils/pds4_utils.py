@@ -173,7 +173,7 @@ def generate_collection(template, directory='.', pattern='*.xml', recursive=True
     root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:records', namespaces=ns)[0].text = str(len(index))
     root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:file_name', namespaces=ns)[0].text = collection_csv
     root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:md5_checksum', namespaces=ns)[0].text = str(md5_hash(csv_file))
-
+    root.xpath('/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:file_size', namespaces=ns)[0].text = str(os.path.getsize(csv_file))
 
     tree.write(collection_xml, xml_declaration=True, encoding=tree.docinfo.encoding) 
 
@@ -264,7 +264,11 @@ class Database:
                     # for each keyword/xpath pair in the config, populate the database
                     for keyword in keywords:
                         path = self.config[prod_type][name]['keywords'][keyword]
-                        result = label.xpath(path, namespaces=ns)
+                        try:
+                            result = label.xpath(path, namespaces=ns)
+                        except etree.XPathEvalError:
+                            log.warn('could not evaluate xpath: {:s}'.format(path))
+                            continue
                         if len(result)==0:
                             dbase[keyword].loc[idx] = None
                             log.warning('meta-data for keyword {:s} not found in product {:s}'.format(
