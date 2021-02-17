@@ -4,15 +4,10 @@
 __init__.py
 
 """
-__all__ = ['pds4_utils']
+__all__ = ['common', 'read', 'write', 'dbase']
 
-# Set up the root logger
-
+# Set up the nullhandler - user applications can configure how to
+# display log messages etc.
 import logging
-# import sys
-
-# logging.basicConfig(format='%(levelname)s %(asctime)s (%(name)s): %(message)s',
-#                     level=logging.INFO, stream=sys.stdout, datefmt='%Y-%m-%d %H:%M:%S')
-
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
