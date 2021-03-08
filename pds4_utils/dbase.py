@@ -88,7 +88,7 @@ def index_products(directory='.', pattern='*.xml', recursive=True):
 
 class Database:
 
-    def __init__(self, files=None, directory='.', config_file=default_config):
+    def __init__(self, files=None, directory='.', config_file=default_config, recursive=True):
         
         from yaml.scanner import ScannerError
 
@@ -107,9 +107,9 @@ class Database:
 
         # build an initial index
         if files is not None:
-            self.index = index_products(directory=directory, pattern=files)
+            self.index = index_products(directory=directory, pattern=files, recursive=recursive)
         else:
-            self.index = index_products(directory=directory, pattern='*.xml')
+            self.index = index_products(directory=directory, pattern='*.xml', recursive=recursive)
             # initialise the dictionary of tables
         
         self.dbase = {}
