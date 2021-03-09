@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='pds4_utils',
-    version='0.1',
+    version='0.2',
     author='Mark S. Bentley',
     author_email='mark@lunartech.org',
     description='A collection of PDS4 utilities',
