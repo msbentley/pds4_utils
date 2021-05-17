@@ -5,6 +5,7 @@ read.py
 
 from . import common
 import os
+from pathlib import Path
 import pandas as pd
 from pds4_tools import pds4_read
 from pds4_tools.reader.table_objects import TableManifest
@@ -65,13 +66,20 @@ def read_tables(label, label_directory='.', recursive=False, table_name=None, in
     for f in file_list:
         if table is None:
             table = read_table(f, table_name=table_name, index_col=index_col, quiet=quiet)
+            cols = table.columns
             if add_filename:
                 table['filename'] = table.filename
         else:
             temp_table = read_table(f, table_name=table_name, index_col=index_col, quiet=quiet)
+            if temp_table is None:
+                continue
+            if set(temp_table.columns) != set(cols):
+                log.warning('product has different columns names, skipping')
+                continue
             if add_filename:
                 temp_table['filename'] = temp_table.filename
-            table = table.append(temp_table)
+            # table = table.append(temp_table)
+            table = pd.concat([table, temp_table], axis=0, join='inner')
 
     table.sort_index(inplace=True)
 
@@ -100,6 +108,7 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     """
 
     data = pds4_read(label_file, quiet=True)
+    labelpath = Path(label_file)
 
     num_arrays = 0
     tables = []
@@ -115,7 +124,7 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
         return None
 
     if not quiet:
-        log.info('product has {:d} tables and {:d} arrays'.format(len(tables), num_arrays))
+        log.info('product {:s} has {:d} tables and {:d} arrays'.format(labelpath.name, len(tables), num_arrays))
 
     if table_name is not None:
         if table_name in tables:
@@ -175,7 +184,8 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     
     if index_col is not None:
         if index_col in fields:
-            data.set_index(index_col, drop=True, inplace=True)        
+            data.set_index(index_col, drop=True, inplace=True)
+            log.info('data indexed with field {:s}'.format(time_cols[0]))   
         else:
             log.warn('requested index field {:s} not found'.format(index_col))
             index_col=None
@@ -185,14 +195,14 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
             log.warning('no time-based columns found, returned data will not be time-indexed')
         elif len(time_cols)==1:
             data.set_index(time_cols[0], drop=True, inplace=True)
-            log.debug('data time indexed with field {:s}'.format(time_cols[0]))
+            log.info('data time-indexed with field {:s}'.format(time_cols[0]))
         else:
             if 'TIME_UTC' in data.columns:
                 data.set_index('TIME_UTC', drop=True, inplace=True)
-                log.debug('data time indexed with field {:s}'.format(time_cols[0]))
+                log.info('data time-indexed with field {:s}'.format(time_cols[0]))
             else:
                 data.set_index(time_cols[0], drop=True, inplace=True)
-                log.debug('data time indexed with field {:s}'.format(time_cols[0]))
+                log.info('data time-indexed with field {:s}'.format(time_cols[0]))
 
     return data
 
