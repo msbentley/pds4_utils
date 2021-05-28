@@ -42,6 +42,11 @@ def read_tables(label, label_directory='.', recursive=False, table_name=None, in
         useful to distinguish between otherwise identical records from several products.
     """
 
+    if quiet:
+        logging.disable(logging.INFO)
+    else:
+        logging.disable(logging.NOTSET)
+
     if recursive:
         selectfiles = common.select_files(label, directory=label_directory, recursive=recursive)
         file_list = [file for file in selectfiles]
@@ -83,6 +88,8 @@ def read_tables(label, label_directory='.', recursive=False, table_name=None, in
 
     table.sort_index(inplace=True)
 
+    logging.disable(logging.NOTSET)
+
     log.info('{:d} files read with {:d} total records'.format(len(file_list), len(table)))
 
     return table
@@ -107,6 +114,11 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     fields are skipped with a warning message!
     """
 
+    if quiet:
+        logging.disable(logging.INFO)
+    else:
+        logging.disable(logging.NOTSET)
+
     data = pds4_read(label_file, quiet=True)
     labelpath = Path(label_file)
 
@@ -123,8 +135,7 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
         log.error('no tables found in this product')
         return None
 
-    if not quiet:
-        log.info('product {:s} has {:d} tables and {:d} arrays'.format(labelpath.name, len(tables), num_arrays))
+    log.info('product {:s} has {:d} tables and {:d} arrays'.format(labelpath.name, len(tables), num_arrays))
 
     if table_name is not None:
         if table_name in tables:
@@ -135,8 +146,7 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     else:
         table = data[tables[0]]
     
-    if not quiet:
-        log.info('using table {:s}'.format(table.id))
+    log.info('using table {:s}'.format(table.id))
 
     # clunky way to get the names of group fields to ignore for now
     table_manifest = TableManifest.from_label(data[table.id].label)
@@ -203,6 +213,8 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
             else:
                 data.set_index(time_cols[0], drop=True, inplace=True)
                 log.info('data time-indexed with field {:s}'.format(time_cols[0]))
+
+    logging.disable(logging.NOTSET)
 
     return data
 
