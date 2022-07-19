@@ -13,6 +13,7 @@ from . import common
 import yaml
 from lxml import etree
 import pandas as pd
+from pathlib import Path
 import os
 
 import logging
@@ -40,7 +41,8 @@ def index_products(directory='.', pattern='*.xml', recursive=True):
     labels = common.select_files(pattern, directory=directory, recursive=recursive)
 
     cols = ['filename', 'product_type', 'lid', 'vid', 'start_time', 'stop_time']
-    index = pd.DataFrame([], columns=cols)
+    # index = pd.DataFrame([], columns=cols)
+    index = []
 
     for label in labels:
         
@@ -55,7 +57,7 @@ def index_products(directory='.', pattern='*.xml', recursive=True):
         if None in ns and common.pds_ns == ns[None]:
             ns['pds'] = ns.pop(None)
 
-        product_type = root.xpath('name(/*)', namespaces=ns)
+        product_type = root.xpath('name(/*)')#, namespaces=ns)
         if not product_type.startswith('Product_'):
             log.warn('XML file {:s} is not a PDS4 label, skipping'.format(Path(label).name))
             continue
@@ -65,14 +67,18 @@ def index_products(directory='.', pattern='*.xml', recursive=True):
         stop_time = root.xpath('//pds:Time_Coordinates/pds:stop_date_time', namespaces=ns)
         stop_time = pd.to_datetime(stop_time[0].text) if len(stop_time)>0 else pd.NaT
 
-        index = index.append({
+        meta = {
             'filename': label,
             'product_type': product_type,
             'lid': root.xpath('pds:Identification_Area/pds:logical_identifier', namespaces=ns)[0].text,
             'vid': root.xpath('pds:Identification_Area/pds:version_id', namespaces=ns)[0].text,
             'start_time': start_time,
             'stop_time': stop_time
-            }, ignore_index=True)
+            }
+
+        index.append(meta)
+
+    index = pd.DataFrame(index, columns=cols)
 
     index['bundle'] = index.lid.apply(lambda x: x.split(':')[3])
     index['collection'] = index.lid.apply(lambda x: x.split(':')[4] if len(x.split(':'))>4 else None)
