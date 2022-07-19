@@ -5,16 +5,22 @@ write.py
 
 from . import dbase
 from . import common
+from . import read
 import os
 from pathlib import Path
+import pandas as pd
 from lxml import etree
 from pathlib import Path
+# from pds4_tools import pds4_read
 
 import logging
 log = logging.getLogger(__name__)
 
 def generate_collection(template, directory='.', pattern='*.xml', recursive=True):
-    """Generates a collection inventory from a set of files and a label template"""
+    """Generates or updates a collection inventory from a set of files and a label template. 
+    This can be an existing collection label. If the label points to an existing inventory
+    any secondary members will be retained and any primary members will be replaced with the
+    real contents of the specified collection."""
 
     index = dbase.index_products(directory, pattern, recursive)
     if len(index)==0:
@@ -32,7 +38,7 @@ def generate_collection(template, directory='.', pattern='*.xml', recursive=True
     collection_name = index.collection.unique()[0]
     collection_csv = 'collection_{:s}.csv'.format(collection_name)
     collection_xml = 'collection_{:s}.xml'.format(collection_name)
-
+    
     # remove any collection and bundle inventories from the product list
     bad_types = ['Product_Collection', 'Product_Bundle']
     bad_idx = bad = index[index.product_type.isin(bad_types)].index
@@ -49,15 +55,24 @@ def generate_collection(template, directory='.', pattern='*.xml', recursive=True
         if None in ns and common.pds_ns == ns[None]:
             ns['pds'] = ns.pop(None)
 
+    # read the existing collection inventory, if any
+    inventory = read.read_table(template)
+    secondary = inventory[inventory.iloc[:,0]=='S'] # regardless of name
+
     # add LID+VID => LIDVID
     index['lidvid'] = index.apply(lambda row: '{:s}::{:s}'.format(row.lid, row.vid), axis=1)
 
-    # add a column for primary/secondary - ALL PRIMARY FOR NOW
+    # add a column for primary/secondary - all those products in this collection are primary
     index['primary'] = 'P'
+    index = index[['primary','lidvid']]
+
+    # merge secondary, if any, coming from the template
+    final = pd.concat([index, secondary.rename(columns={'Member Status':'primary','LIDVID_LID':'lidvid'})], ignore_index=True)
+
 
     # write the CSV
     csv_file = os.path.join(directory, collection_csv)
-    index[['primary','lidvid']].to_csv(csv_file, header=False, index=False, line_terminator='\r\n')
+    final.to_csv(csv_file, header=False, index=False, line_terminator='\r\n')
 
     # check if the template is a Product_Collection
     if root.tag != '{http://pds.nasa.gov/pds4/pds/v1}Product_Collection':
