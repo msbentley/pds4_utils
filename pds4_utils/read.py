@@ -15,6 +15,7 @@ import logging
 pds4_logger = logging.getLogger('PDS4ToolsLogger')
 pds4_logger.setLevel(logging.WARNING)
 
+# bfrom . import log 
 log = logging.getLogger(__name__)
 
 class pds4_df(pd.DataFrame):
@@ -104,14 +105,14 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     using PDS4 time data types are converted to Timestamps.
 
     By default the first table is read, otherwise the
-    table_name can be used to specify.
+    table can be used to specify either the 0-based index of
+    the table or the name (string).
 
     If index_col is set, this field will be used as an index in 
     the returned pandas DataFrame, otherwise if a time field
     is present this will be used.
 
-    NOTE: only simple 2D tables can currently be read. Group
-    fields are skipped with a warning message!
+    NOTE: only one level of group fields are handled here
     """
 
     if quiet:
@@ -119,7 +120,7 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     else:
         logging.disable(logging.NOTSET)
 
-    data = pds4_read(label_file, quiet=True)
+    data = pds4_read(label_file, lazy_load=True, quiet=True)
     labelpath = Path(label_file)
 
     num_arrays = 0
@@ -138,35 +139,46 @@ def read_table(label_file, table_name=None, index_col=None, quiet=True):
     log.info('product {:s} has {:d} tables and {:d} arrays'.format(labelpath.name, len(tables), num_arrays))
 
     if table_name is not None:
-        if table_name in tables:
-            table = data[table_name]
-        else:
-            log.error('table name {:s} not found in product'.format(table_name))
-            return None
+        if isinstance(table_name, str):
+            if table_name in tables:
+                table = data[table_name]
+            else:
+                log.error('table name {:s} not found in product'.format(table_name))
+                return None
+        elif isinstance(table_name, int):
+            if table_name <= len(tables):
+                table = data[table_name]
+            else:
+                log.error('table number {:d} not found in product'.format(table_name))
+                return None
     else:
         table = data[tables[0]]
     
     log.info('using table {:s}'.format(table.id))
 
-    # clunky way to get the names of group fields to ignore for now
-    table_manifest = TableManifest.from_label(data[table.id].label)
+    # clunky way to get the names of group fields
+    table_manifest = TableManifest.from_label(data[table_name].label)
 
     time_cols = []
     fields = []
     group_fields = []
 
+    # Work around https://github.com/Small-Bodies-Node/pds4_tools/issues/68
+    # Rename field names with colons to have underscores instead
+
     for i in range(len(table_manifest)):
         if table_manifest[i].is_group():
             continue
-        name = table_manifest[i].full_name()
+        name = table_manifest[i].full_name().replace(':', '_')
         if table_manifest.get_parent_by_idx(i):
-            group_fields.append(table_manifest[i].full_name())
+            group_fields.append(table_manifest[i].full_name().replace(':', '_'))
             continue
         fields.append(name)
 
         data_type = table_manifest[i]['data_type']
         if 'Date' in data_type:
            time_cols.append(name)
+
 
         # TODO: fix nested tables (group fields)
         # TODO: fix handling of masked arrays (in particular missing vals in CSVs trigger this)
