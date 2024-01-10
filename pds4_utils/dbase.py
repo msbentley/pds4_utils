@@ -35,7 +35,6 @@ def index_products(directory='.', pattern='*.xml', recursive=True):
 
     from lxml import etree
     import pandas as pd
-    import math
 
     # recursively find all labels
     labels = common.select_files(pattern, directory=directory, recursive=recursive)
