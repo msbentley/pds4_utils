@@ -15,7 +15,6 @@ import logging
 pds4_logger = logging.getLogger('PDS4ToolsLogger')
 pds4_logger.setLevel(logging.WARNING)
 
-# bfrom . import log 
 log = logging.getLogger(__name__)
 
 class pds4_df(pd.DataFrame):
