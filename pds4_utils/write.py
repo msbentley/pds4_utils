@@ -72,7 +72,7 @@ def generate_collection(template, directory='.', pattern='*.xml', recursive=True
 
     # write the CSV
     csv_file = os.path.join(directory, collection_csv)
-    final.to_csv(csv_file, header=False, index=False, line_terminator='\r\n')
+    final.to_csv(csv_file, header=False, index=False, lineterminator='\r\n')
 
     # check if the template is a Product_Collection
     if root.tag != '{http://pds.nasa.gov/pds4/pds/v1}Product_Collection':
