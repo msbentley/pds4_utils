@@ -86,6 +86,7 @@ def generate_collection(template, directory='.', pattern='*.xml', recursive=True
 
     # write the filename, checksum and number of records into the template
     set_if_exists(root, '/pds:Product_Collection/pds:File_Area_Inventory/pds:Inventory/pds:records', len(index))
+    set_if_exists(root, '/pds:Product_Collection/pds:File_Area_Inventory/pds:Inventory/pds:object_length', os.path.getsize(csv_file))
     set_if_exists(root, '/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:records', len(index))
     set_if_exists(root, '/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:file_name', collection_csv)
     set_if_exists(root, '/pds:Product_Collection/pds:File_Area_Inventory/pds:File/pds:md5_checksum', common.md5_hash(csv_file))
